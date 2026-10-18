@@ -1,0 +1,51 @@
+name: Salon Instagram Search
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_rows:
+        description: 'تعداد ردیف برای تست (خالی = همه)'
+        required: false
+        default: '10'
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas python-dotenv
+
+      - name: Run search script
+        env:
+          AVALAI_API_KEY: ${{ secrets.AVALAI_API_KEY }}
+          MAX_ROWS: ${{ github.event.inputs.max_rows }}
+        run: |
+          python - <<'PYEOF'
+          import os, re
+          src = open('test_full_v6.py', encoding='utf-8').read()
+          mr = os.environ.get('MAX_ROWS', '').strip()
+          new_val = 'None' if mr == '' else mr
+          src = re.sub(r'^MAX_ROWS\s*=\s*.*$', f'MAX_ROWS = {new_val}', src, flags=re.M)
+          open('_run.py', 'w', encoding='utf-8').write(src)
+          PYEOF
+          python _run.py
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-results
+          path: salons_search_results_v6.csv
+          if-no-files-found: warn
+          retention-days: 30
